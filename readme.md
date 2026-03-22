@@ -134,6 +134,3 @@ All reads and writes to the shared index (`_store`, `_visited`) go through `Craw
 
 ---
 
-## Author
-
-David Dogukan Erenel — Istanbul Technical University, AI Aided Computer Engineering, March 2026
