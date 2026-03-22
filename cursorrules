@@ -1,0 +1,142 @@
+# .cursorrules
+# Project: Google in a Day — Web Crawler & Real-Time Search Engine
+# Language: Python 3.11+
+# Course: AI Aided Computer Engineering, Istanbul Technical University
+
+---
+
+## Who You Are
+
+You are a Senior Python Systems Engineer helping a student build a concurrent web
+crawler and real-time search engine from scratch. Your role is to act as a
+collaborative pair programmer — not to write everything at once, but to build
+incrementally, explain every decision, and teach as you go.
+
+---
+
+## Hard Constraints (Never Violate These)
+
+1. **No third-party libraries.** Use ONLY Python standard library.
+   - HTTP fetching: `urllib.request`, `urllib.parse`, `urllib.error`
+   - HTML parsing: `html.parser` (subclass `HTMLParser`)
+   - Concurrency: `threading`, `queue`
+   - Data: `dataclasses`, `collections`, `json`
+   - CLI: `sys`, `os`, `time`
+   - FORBIDDEN: `requests`, `httpx`, `beautifulsoup4`, `scrapy`, `aiohttp`, `lxml`
+
+2. **No monolithic files.** Code must be split across:
+   `core/config.py`, `core/index.py`, `core/crawler.py`, `core/searcher.py`,
+   `core/dashboard.py`, `core/api.py`, and `main.py` at the project root.
+
+3. **No raw shared state.** Every read/write to shared data (`_store`, `_visited`)
+   MUST go through `CrawlIndex` methods which acquire `threading.Lock`.
+   Workers never access dicts or sets directly.
+
+4. **No silent broad exceptions.** Never write `except Exception: pass`.
+   Always log the URL and error type before continuing.
+
+---
+
+## Code Style Rules
+
+- Python 3.11+ syntax
+- Use `@dataclass` for all data models (`PageRecord`, `SearchResult`)
+- Type hints on every function signature
+- Constants in ALL_CAPS in `config.py` only — never hardcoded inline
+- Max line length: 88 characters (Black-compatible)
+- Docstrings on every class and public method (one-line is fine)
+- Use f-strings, not `.format()` or `%`
+
+---
+
+## Architecture Rules
+
+Follow this exact module responsibility split:
+
+| File | Owns | Does NOT own |
+|---|---|---|
+| `core/config.py` | Constants | Any logic |
+| `core/index.py` | Shared state + lock | HTTP, threading setup |
+| `core/crawler.py` | Fetch + parse + enqueue | Index lock internals |
+| `core/searcher.py` | Scoring logic | Threading, I/O |
+| `core/dashboard.py` | Terminal display | Business logic |
+| `core/api.py` | Flask + SSE + HTTP routes | Crawler internals |
+| `main.py` | Wiring + thread lifecycle | Business logic |
+
+---
+
+## Concurrency Rules
+
+- Back-pressure MUST be implemented via `queue.Queue(maxsize=QUEUE_MAX_SIZE)`
+  Workers call `url_queue.put(item)` — this blocks naturally when full. Do not
+  implement a custom throttle on top of this unless also adding `REQUEST_DELAY_SEC`.
+- All worker threads MUST be started as `daemon=False` except the dashboard thread
+  which MUST be `daemon=True`.
+- Use `threading.Lock` (not `RLock`) unless recursive locking is explicitly needed.
+- `mark_visited()` in `CrawlIndex` MUST be atomic: check + add in one lock block.
+
+---
+
+## Crawling Rules
+
+- URL normalization order: urljoin → strip fragment → lowercase scheme+host → domain filter
+- Respect `SAME_DOMAIN_ONLY` from config — never crawl outside the seed domain unless
+  this flag is False
+- Respect `MAX_DEPTH` — never enqueue a URL at depth > MAX_DEPTH
+- Each worker MUST sleep `REQUEST_DELAY_SEC` between requests (be polite)
+- Timeout every HTTP request using `urllib.request.urlopen(url, timeout=REQUEST_TIMEOUT_SEC)`
+
+---
+
+## Search / Scoring Rules
+
+- `searcher.search()` is a pure function — no side effects, no global state
+- Relevance score formula:
+  `score = keyword_freq_sum + (2 * title_keyword_matches)`
+- Return only results with `score > 0`
+- Results sorted descending by score
+- Return as list of `SearchResult` dataclass instances
+
+---
+
+## How to Respond to My Prompts
+
+- **Build one module at a time.** When I say "build index.py", write only index.py.
+- **Explain before you code.** One short paragraph on your approach, then the code.
+- **After each module**, tell me: "To test this, run: ..." with a concrete test command
+  or inline test snippet.
+- **If I ask you to add a feature**, first check if it violates any constraint above.
+  If it does, say so and propose a compliant alternative.
+- **Never refactor a module I haven't asked you to touch** in the current prompt.
+- **If something is ambiguous**, ask one clarifying question before proceeding.
+
+---
+
+## Build Order (Do Not Skip Steps)
+
+1. `config.py`
+2. `index.py` + inline test
+3. `crawler.py` + test with single URL
+4. `searcher.py` + test with mock index
+5. `dashboard.py` + test with mock stats
+6. `main.py` + end-to-end test at depth=1
+
+---
+
+## Example Prompt Templates (Use These With Cursor)
+
+**Starting a module:**
+> "Following the architecture doc and cursorrules, build `index.py`.
+>  Explain your approach first, then write the code."
+
+**Adding a feature:**
+> "Add persistence to `index.py` — serialize the store to JSON every 30 seconds.
+>  Check constraints first."
+
+**Debugging:**
+> "Worker threads are deadlocking. Here is the relevant code: [paste].
+>  Diagnose and fix without changing the locking strategy."
+
+**Explaining code:**
+> "Explain this section of crawler.py as if I'm presenting it to a professor:
+>  [paste code]. Focus on why threading.Lock is used here."

@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Google in a Day — Live Dashboard</title>
+  <style>
+    :root {
+      --bg: #0d0d1a;
+      --card: #1a1a2e;
+      --text: #ffffff;
+      --muted: #a0a0c0;
+      --border: #7c3aed;
+      --accent: #7c3aed;
+      --ok-bg: #0f2d1f;
+      --ok-border: #22c55e;
+      --throttle-bg: #2d0f0f;
+      --throttle-border: #ef4444;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      margin: 0;
+      padding: 1.25rem 1.5rem 2rem;
+      background: var(--bg);
+      color: var(--text);
+      max-width: 72rem;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    header {
+      margin-bottom: 1.5rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.75rem;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 1.5rem;
+      font-weight: 650;
+      background: linear-gradient(90deg, #a78bfa, #60a5fa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    @media (max-width: 960px) {
+      .cards { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 520px) {
+      .cards { grid-template-columns: 1fr; }
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem 1.1rem;
+      box-shadow: 0 0 12px rgba(124, 58, 237, 0.15);
+    }
+    .card-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+      margin-bottom: 0.35rem;
+    }
+    .card-value {
+      font-size: 1.65rem;
+      font-weight: 700;
+      line-height: 1.2;
+      word-break: break-word;
+      color: #a78bfa;
+    }
+    .card.throttle-ok {
+      background: var(--ok-bg);
+      border-color: var(--ok-border);
+    }
+    .card.throttle-throttled {
+      background: var(--throttle-bg);
+      border-color: var(--throttle-border);
+    }
+    .card.throttle-ok .card-value { color: #22c55e; }
+    .card.throttle-throttled .card-value { color: #ef4444; }
+    .chart-wrap {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem 1rem 0.5rem;
+      margin-bottom: 1rem;
+      box-shadow: 0 0 12px rgba(124, 58, 237, 0.15);
+    }
+    .chart-wrap h2 {
+      margin: 0 0 0.75rem;
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--muted);
+    }
+    .chart-wrap canvas {
+      max-height: 220px;
+    }
+    .last-url {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.75rem 1rem;
+      margin-bottom: 1.5rem;
+      font-size: 0.9rem;
+      box-shadow: 0 0 12px rgba(124, 58, 237, 0.15);
+    }
+    .last-url .label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+      margin-bottom: 0.35rem;
+    }
+    .last-url .value {
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      max-width: 100%;
+      font-family: ui-monospace, monospace;
+      color: #60a5fa;
+    }
+    .search-section {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.1rem 1.25rem;
+      box-shadow: 0 0 12px rgba(124, 58, 237, 0.15);
+    }
+    .search-section h2 {
+      margin: 0 0 0.75rem;
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--muted);
+    }
+    .search-section label {
+      display: block;
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 0.35rem;
+    }
+    .search-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+    }
+    .search-section input[type="text"] {
+      flex: 1;
+      min-width: 12rem;
+      padding: 0.5rem 0.65rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 1rem;
+      background: #0d0d1a;
+      color: white;
+    }
+    .search-section input[type="text"]::placeholder { color: var(--muted); }
+    .search-section button {
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      border: none;
+      background: var(--accent);
+      color: #fff;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .search-section button:hover { background: #6d28d9; }
+    #search-out, #sse-buffer {
+      margin-top: 0.85rem;
+      padding: 0.75rem;
+      background: #0d0d1a;
+      border: 1px solid #2d2d4e;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      overflow: auto;
+      max-height: 14rem;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: #a78bfa;
+    }
+    .status-bar {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 0.5rem;
+    }
+    #metrics-panel[hidden] {
+      display: none !important;
+    }
+    #start-panel[hidden] {
+      display: none !important;
+    }
+    .start-crawl-section {
+      background: var(--card);
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 0 12px rgba(124, 58, 237, 0.2);
+    }
+    .start-crawl-section h2 {
+      margin: 0 0 1rem;
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .start-crawl-section label {
+      display: block;
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 0.35rem;
+    }
+    .start-crawl-section input[type="text"],
+    .start-crawl-section input[type="number"] {
+      width: 100%;
+      max-width: 36rem;
+      padding: 0.55rem 0.7rem;
+      margin-bottom: 0.85rem;
+      background: #0d0d1a;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: #fff;
+      font-size: 1rem;
+    }
+    .start-crawl-section input::placeholder {
+      color: var(--muted);
+    }
+    .start-crawl-section button[type="submit"] {
+      padding: 0.6rem 1.35rem;
+      border-radius: 6px;
+      border: none;
+      background: var(--accent);
+      color: #fff;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .start-crawl-section button[type="submit"]:hover {
+      background: #6d28d9;
+    }
+    .start-error {
+      color: #f87171;
+      margin-top: 0.75rem;
+      font-size: 0.9rem;
+      min-height: 1.25rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Google in a Day — Live Dashboard</h1>
+  </header>
+
+  <section id="start-panel" class="start-crawl-section">
+    <h2>Start Crawl</h2>
+    <form id="start-crawl-form">
+      <label for="start-url">Origin URL</label>
+      <input
+        type="text"
+        id="start-url"
+        name="start-url"
+        autocomplete="url"
+        placeholder="https://wikipedia.org/wiki/Web_crawler"
+      />
+      <label for="start-depth">Max Depth</label>
+      <input
+        type="number"
+        id="start-depth"
+        name="start-depth"
+        min="1"
+        max="5"
+        value="2"
+      />
+      <button type="submit">Start Crawl</button>
+    </form>
+    <div id="start-error" class="start-error" role="alert"></div>
+  </section>
+
+  <div id="metrics-panel" hidden>
+  <div class="cards">
+    <div class="card" id="card-pages">
+      <div class="card-label">Pages indexed</div>
+      <div class="card-value" id="val-pages">—</div>
+    </div>
+    <div class="card" id="card-urls">
+      <div class="card-label">URLs visited</div>
+      <div class="card-value" id="val-urls">—</div>
+    </div>
+    <div class="card" id="card-queue">
+      <div class="card-label">Queue depth</div>
+      <div class="card-value" id="val-queue">— / —</div>
+    </div>
+    <div class="card" id="card-throttle">
+      <div class="card-label">Throttle status</div>
+      <div class="card-value" id="val-throttle">…</div>
+    </div>
+  </div>
+
+  <div class="chart-wrap">
+    <h2>Queue depth over time (last 30 samples)</h2>
+    <canvas id="queueChart" height="120"></canvas>
+  </div>
+
+  <div class="last-url">
+    <div class="label">Last indexed URL</div>
+    <span class="value" id="val-last-url" title="">(none yet)</span>
+  </div>
+  </div>
+
+  <section class="search-section">
+    <h2>Search</h2>
+    <label for="q">Query</label>
+    <form id="search-form" class="search-row">
+      <input type="text" id="q" name="q" autocomplete="off" placeholder="Enter keywords…" />
+      <button type="submit">Search</button>
+    </form>
+    <div class="status-bar" id="sse-status">Connecting to live stream…</div>
+    <pre id="search-out"></pre>
+    <div class="label" style="margin-top:0.75rem;">Results buffer (from SSE)</div>
+    <pre id="sse-buffer">[]</pre>
+  </section>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <script>
+    (function () {
+      const MAX_POINTS = 30;
+      const depthHistory = [];
+
+      const el = (id) => document.getElementById(id);
+      const valPages = el("val-pages");
+      const valUrls = el("val-urls");
+      const valQueue = el("val-queue");
+      const valThrottle = el("val-throttle");
+      const cardThrottle = el("card-throttle");
+      const valLastUrl = el("val-last-url");
+      const sseStatus = el("sse-status");
+      const searchOut = el("search-out");
+      const sseBuffer = el("sse-buffer");
+      const form = el("search-form");
+      const qInput = el("q");
+      const startPanel = el("start-panel");
+      const metricsPanel = el("metrics-panel");
+      const startForm = el("start-crawl-form");
+      const startUrlInput = el("start-url");
+      const startDepthInput = el("start-depth");
+      const startError = el("start-error");
+
+      let queueChart = null;
+      let es = null;
+
+      function ensureChart() {
+        if (queueChart) {
+          return;
+        }
+        const ctx = el("queueChart").getContext("2d");
+        queueChart = new Chart(ctx, {
+          type: "line",
+          data: {
+            labels: [],
+            datasets: [
+              {
+                label: "Queue depth",
+                data: [],
+                borderColor: "#7c3aed",
+                backgroundColor: "rgba(124, 58, 237, 0.15)",
+                fill: true,
+                tension: 0.25,
+                pointRadius: 2,
+                pointHoverRadius: 4,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            interaction: { mode: "index", intersect: false },
+            plugins: {
+              legend: {
+                display: true,
+                position: "top",
+                labels: { color: "#e0e0e0" },
+              },
+            },
+            scales: {
+              x: {
+                title: { display: true, text: "Sample", color: "#a0a0c0" },
+                ticks: { maxTicksLimit: 10, color: "#a0a0c0" },
+                grid: { color: "rgba(124, 58, 237, 0.12)" },
+              },
+              y: {
+                beginAtZero: true,
+                title: { display: true, text: "Depth", color: "#a0a0c0" },
+                ticks: { stepSize: 1, color: "#a0a0c0" },
+                grid: { color: "rgba(124, 58, 237, 0.12)" },
+              },
+            },
+          },
+        });
+      }
+
+      function pushDepth(n) {
+        if (!queueChart) {
+          return;
+        }
+        depthHistory.push(Number(n));
+        while (depthHistory.length > MAX_POINTS) {
+          depthHistory.shift();
+        }
+        queueChart.data.labels = depthHistory.map(function (_, i) {
+          return String(i + 1);
+        });
+        queueChart.data.datasets[0].data = depthHistory.slice();
+        queueChart.update("none");
+      }
+
+      function connectStream() {
+        ensureChart();
+        if (es) {
+          return;
+        }
+        es = new EventSource("/stream");
+        es.onmessage = function (ev) {
+          try {
+            var d = JSON.parse(ev.data);
+            valPages.textContent = String(d.pages_indexed);
+            valUrls.textContent = String(d.urls_visited);
+            valQueue.textContent =
+              String(d.queue_depth) + " / " + String(d.queue_max);
+
+            if (d.throttled) {
+              cardThrottle.classList.remove("throttle-ok");
+              cardThrottle.classList.add("throttle-throttled");
+              valThrottle.textContent = "THROTTLED";
+            } else {
+              cardThrottle.classList.remove("throttle-throttled");
+              cardThrottle.classList.add("throttle-ok");
+              valThrottle.textContent = "OK";
+            }
+
+            pushDepth(d.queue_depth);
+
+            var last = d.last_indexed_url;
+            if (last) {
+              valLastUrl.textContent = last;
+              valLastUrl.setAttribute("title", last);
+            } else {
+              valLastUrl.textContent = "(none)";
+              valLastUrl.setAttribute("title", "");
+            }
+
+            sseBuffer.textContent = JSON.stringify(d.search_results, null, 2);
+            sseStatus.textContent = "Live stream active (SSE, ~1.5s updates)";
+          } catch (err) {
+            sseStatus.textContent = "SSE parse error: " + err;
+          }
+        };
+        es.onerror = function () {
+          sseStatus.textContent = "SSE connection issue — reconnecting…";
+        };
+      }
+
+      function showStartForm() {
+        startPanel.removeAttribute("hidden");
+        metricsPanel.setAttribute("hidden", "");
+        sseStatus.textContent = "Start a crawl to enable live metrics.";
+      }
+
+      function showDashboard() {
+        startPanel.setAttribute("hidden", "");
+        metricsPanel.removeAttribute("hidden");
+        connectStream();
+        if (queueChart) {
+          queueChart.resize();
+        }
+      }
+
+      async function initFromStatus() {
+        try {
+          var res = await fetch("/status");
+          var data = await res.json();
+          if (data.crawl_started) {
+            showDashboard();
+          } else {
+            showStartForm();
+          }
+        } catch (err) {
+          startError.textContent = "Could not load status: " + err;
+          showStartForm();
+        }
+      }
+
+      startForm.addEventListener("submit", async function (e) {
+        e.preventDefault();
+        startError.textContent = "";
+        var url = startUrlInput.value.trim();
+        var depth = parseInt(startDepthInput.value, 10);
+        try {
+          var res = await fetch("/start", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url: url, depth: depth }),
+          });
+          var payload = await res.json();
+          if (!res.ok) {
+            startError.textContent =
+              payload.error || "Request failed (" + res.status + ")";
+            return;
+          }
+          showDashboard();
+        } catch (err) {
+          startError.textContent = String(err);
+        }
+      });
+
+      form.addEventListener("submit", async function (e) {
+        e.preventDefault();
+        var query = qInput.value.trim();
+        searchOut.textContent = "Searching…";
+        try {
+          var res = await fetch("/search", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ query: query }),
+          });
+          var data = await res.json();
+          searchOut.textContent = JSON.stringify(data, null, 2);
+        } catch (err) {
+          searchOut.textContent = "Request failed: " + err;
+        }
+      });
+
+      initFromStatus();
+    })();
+  </script>
+</body>
+</html>
