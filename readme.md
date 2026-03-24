@@ -1,136 +1,109 @@
-# Google in a Day
-A functional web crawler and real-time search engine built with Python — no third-party scraping libraries.
+# 🕸️ Google in a Day
 
-Built for the AI Aided Computer Engineering course at Istanbul Technical University.
+A functional web crawler, indexer, and real-time search engine built natively with Python — no third-party scraping libraries.
 
----
-
-## Demo
-
-Start the server, open `http://127.0.0.1:5000`, enter a seed URL and depth, and watch the dashboard crawl and index pages in real time. Search the live index from the browser while crawling is still in progress.
+Built for the **AI Aided Computer Engineering** course at Istanbul Technical University.
 
 ---
 
-## Features
+## ⚡ Features
 
-- **Concurrent crawler** — configurable worker thread pool crawls pages in parallel
-- **Real-time web dashboard** — live stat cards, queue depth chart, and last indexed URL updating via Server-Sent Events
-- **Live search** — keyword search runs against the index while the crawler is still active
-- **Back-pressure** — bounded queue automatically throttles workers when the system is under load
-- **Thread-safe index** — all shared state protected by `threading.Lock`
-- **Native Python only** — crawler uses `urllib` and `html.parser`, no Scrapy or BeautifulSoup
+- **Concurrent Crawler:** A configurable pool of worker threads crawls pages in parallel.
+- **Real-Time Dashboard:** Flask-powered live status dashboard with Server-Sent Events (SSE) tracking queue depth, indexed pages, and active URLs.
+- **RESTful API:** Run queries via the modern `GET /search` endpoint or the real-time UI.
+- **Dual-Port Server:** Hosts the API simultaneously on `127.0.0.1:5000` and `127.0.0.1:3600`.
+- **Index Persistence:** Automatically saves the parsed inverted index to `data/storage/p.data` when crawling finishes.
+- **Live Search:** Execute keyword searches against the index natively while the crawler is still active.
+- **Back-Pressure Mechanism:** Bounded queues gracefully throttle worker threads under heavy loads.
+- **Native Python:** Implemented purely with `urllib`, `html.parser`, and core libraries. No Scrapy or BeautifulSoup required.
 
 ---
 
-## Requirements
+## 🚀 Quick Start
 
-- Python 3.11+
+### Requirements
+- Python `3.11+`
 - Flask (`pip install flask`)
 
-No other dependencies.
-
----
-
-## Setup
-
+### Setup and Run
 ```bash
-git clone https://github.com/YOUR_USERNAME/google-in-a-day
-cd google-in-a-day
+git clone https://github.com/Boitsy/google-in-a-day_BLG-483E.git
+cd google-in-a-day_BLG-483E
 pip install flask
-```
-
----
-
-## Running
-
-```bash
 python main.py
 ```
 
-Then open **http://127.0.0.1:5000** in your browser.
+Then, open **http://127.0.0.1:5000** (or **http://127.0.0.1:3600**) in your web browser.
 
 You can also override the seed URL and depth from the command line:
-
 ```bash
 python main.py --url "https://quotes.toscrape.com/" --depth 2
 ```
 
-Optional `--url` / `--depth` only update `core.config` at process startup; you still start the crawl from the browser (**Start Crawl**).
+> **Note:** Providing `--url` and `--depth` via the CLI only updates `core.config` at startup. You must still click **Start Crawl** in the browser to begin.
 
 ---
 
-## Usage
+## 📖 Usage
 
-1. Open `http://127.0.0.1:5000`
-2. Enter an Origin URL (e.g. `https://quotes.toscrape.com/`) and Max Depth (1–5)
-3. Click **Start Crawl** — the dashboard activates and metrics update live
-4. Type a query in the Search box and click **Search** to query the live index
-5. Press `Ctrl+C` in the terminal to stop
+1. Open `http://127.0.0.1:5000` or `http://127.0.0.1:3600`.
+2. Enter an **Origin URL** (e.g., `https://quotes.toscrape.com/`) and a **Max Depth** (1–5).
+3. Click **Start Crawl** — the dashboard activates, and real-time metrics begin streaming.
+4. Use the **Search** box or hit the `GET /search?query={your_term}` endpoint to query the live index.
+5. Once the queue drains, the inverted index is securely persisted to disk at `data/storage/p.data`.
+6. Press `Ctrl+C` in the terminal to stop the crawler gracefully.
 
-Good seed URLs for testing:
-- `https://quotes.toscrape.com/` — crawler-friendly, lots of links
-- `https://books.toscrape.com/` — larger site, good for depth 2
-- `https://crawler-test.com/` — designed for crawler testing
+**Crawler-friendly Seed URLs:**
+- `https://quotes.toscrape.com/` — Lots of text and pagination links.
+- `https://books.toscrape.com/` — A larger site, ideal for depth 2 or 3.
+- `https://crawler-test.com/` — Designed explicitly for crawler verification.
 
 ---
 
-## Configuration
+## ⚙️ Configuration
 
-All tunable values live in `config.py`:
+Tune crawler behavior via `core/config.py`:
 
 | Parameter | Default | Description |
 |---|---|---|
 | `SEED_URL` | `https://example.com/` | Default seed (overridden by UI or CLI) |
 | `MAX_DEPTH` | `3` | Maximum crawl depth |
 | `MAX_WORKERS` | `5` | Number of concurrent crawler threads |
-| `QUEUE_MAX_SIZE` | `100` | Bounded queue size (back-pressure) |
+| `QUEUE_MAX_SIZE` | `100` | Bounded queue size for back-pressure |
 | `REQUEST_DELAY_SEC` | `0.5` | Polite delay between requests per worker |
 | `REQUEST_TIMEOUT_SEC` | `5.0` | HTTP request timeout |
-| `SAME_DOMAIN_ONLY` | `True` | Restrict crawl to seed domain |
-| `TOP_N_RESULTS` | `10` | Max search results returned |
+| `SAME_DOMAIN_ONLY` | `True` | Restricts the crawl rigidly to the seed domain |
+| `TOP_N_RESULTS` | `10` | Maximum search results returned by the engine |
 
 ---
 
-## Architecture
+## 🏗️ Architecture
 
-```
+```text
 google-in-a-day/
-├── main.py           # Entry point: wires all components together
+├── main.py           # Core entry point wiring the threads and dual-servers
+├── data/storage/     # Saved index data (e.g. p.data)
 ├── core/
-│   ├── config.py     # All tunable constants
-│   ├── index.py      # Thread-safe in-memory index (CrawlIndex)
-│   ├── crawler.py    # Worker threads: fetch → parse → enqueue → store
-│   ├── searcher.py   # Pure search function: keyword scoring over live index
-│   ├── api.py        # Flask server: SSE stream, /start, /search routes
-│   └── dashboard.py  # Optional CLI dashboard (terminal)
+│   ├── config.py     # Centralized tunable constants
+│   ├── index.py      # Thread-safe inverted index manager
+│   ├── crawler.py    # Multi-threaded worker pipeline
+│   ├── searcher.py   # TF-IDF / Frequency based keyword scoring
+│   ├── storage.py    # Persistence logic to save the index to disk
+│   └── api.py        # Flask App: dual-port daemon, SSE stream, persistence hooks
 └── templates/
-    └── dashboard.html  # Browser UI: stat cards, live chart, search
+    └── dashboard.html# Real-time UI with D3/Chart options
 ```
 
-### How it works
-
-1. `main.py` starts `MAX_WORKERS` `CrawlerWorker` threads and a Flask server
-2. The browser hits `/start` with a seed URL — this seeds the queue and begins crawling
-3. Each worker dequeues a `(url, origin_url, depth)` tuple, fetches the page with `urllib`, parses links with `html.parser`, and stores a `PageRecord` in `CrawlIndex`
-4. New URLs are enqueued only if `mark_visited()` returns True (atomic check-and-add under a lock)
-5. The browser connects to `/stream` (SSE) and receives index stats every 1.5 seconds
-6. `/search` runs `core.searcher.search()` against the live index and returns ranked results
-
-### Back-pressure
-
-`queue.Queue(maxsize=QUEUE_MAX_SIZE)` is Python's built-in back-pressure mechanism. Workers calling `.put()` block automatically when the queue is full — no URLs are dropped, workers simply wait. The dashboard shows "THROTTLED" when queue depth exceeds 80% of capacity.
-
-### Thread safety
-
-All reads and writes to the shared index (`_store`, `_visited`) go through `CrawlIndex` methods which acquire a `threading.Lock`. No worker ever accesses raw dicts or sets directly. `mark_visited()` is atomic: the check and add happen inside a single lock acquisition.
+### Inner Workings
+1. **Concurrency:** `main.py` launches `MAX_WORKERS` tracking threads alongside dual daemonized Flask servers.
+2. **Execution Pipeline:** Workers pull URLs from the queue, fetch via `urllib`, parse HTML, build word frequencies, and commit `PageRecords` to the synchronized `CrawlIndex`.
+3. **Thread Safety:** All index interactions use `threading.Lock`. Atomic validation ensures pages are indexed exactly once.
+4. **Data Persistence:** The `/start` API triggers a background daemon that `.join()`s the URL queue. Once the crawl concludes, it triggers `save_index()`. 
 
 ---
 
-## Project Deliverables
+## 📑 Project Deliverables
 
-- `readme.md` — this file
-- `product_prd.md` — full Product Requirements Document
-- `recommendation.md` — production deployment roadmap
-
----
-
+- [`readme.md`](./readme.md) — Documentation
+- `product_prd.md` — Complete Product Requirements Document
+- `recommendation.md` — Roadmap for production-scale deployment
