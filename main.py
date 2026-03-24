@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import argparse
 import queue
+import threading
 
 import core.config as config
+from core.storage import save_index
 from core.api import DashboardAPI
 from core.crawler import CrawlerWorker
 from core.index import CrawlIndex
@@ -53,6 +55,13 @@ def main() -> None:
     ]
     for worker in workers:
         worker.start()
+
+    def _save_when_done():
+        url_queue.join()
+        save_index(index)
+        print("Index saved to data/storage/p.data")
+
+    threading.Thread(target=_save_when_done, daemon=True).start()
 
     api = DashboardAPI(index, url_queue, config)
     api.start(host="127.0.0.1", port=5000)

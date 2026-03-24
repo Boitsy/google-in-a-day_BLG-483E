@@ -72,6 +72,16 @@ class DashboardAPI:
                 self._index.mark_visited(seed_url)
                 self._url_queue.put((seed_url, seed_url, 0))
                 self._crawl_started = True
+
+                import threading
+                from core.storage import save_index
+
+                def _save_when_done():
+                    self._url_queue.join()
+                    save_index(self._index)
+                    print("Index saved to data/storage/p.data")
+
+                threading.Thread(target=_save_when_done, daemon=True).start()
             self._spawn_sentinel_when_queue_drained()
             return jsonify({"ok": True})
 
@@ -90,6 +100,22 @@ class DashboardAPI:
                 "X-Accel-Buffering": "no",
             }
             return Response(event_stream(), headers=headers)
+
+        @self.app.route("/search", methods=["GET"])
+        def search_get_route():
+            q = request.args.get("query", "")
+            hits = search(q, self._index, self._config.TOP_N_RESULTS)
+            return jsonify({
+                "results": [
+                    {
+                        "url": getattr(h, "url", ""),
+                        "origin_url": getattr(h, "origin_url", getattr(h, "source_url", "")),
+                        "depth": getattr(h, "depth", 1),
+                        "relevance_score": getattr(h, "score", getattr(h, "relevance_score", 0.0))
+                    }
+                    for h in hits
+                ]
+            })
 
         @self.app.route("/search", methods=["POST"])
         def search_route():
@@ -150,4 +176,13 @@ class DashboardAPI:
                 use_reloader=False,
             )
 
+        def _run_secondary() -> None:
+            self.app.run(
+                host=host,
+                port=3600,
+                threaded=True,
+                use_reloader=False,
+            )
+
         threading.Thread(target=_run, daemon=True).start()
+        threading.Thread(target=_run_secondary, daemon=True).start()
